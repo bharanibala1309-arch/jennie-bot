@@ -1,4 +1,5 @@
 import logging
+import os
 from telegram import (
     Update,
     InlineKeyboardButton,
@@ -24,6 +25,8 @@ from questions import (
     FINISH_THE_SENTENCE,
 )
 
+# 🔐 Token from environment variable
+TOKEN = os.getenv("BOT_TOKEN")
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -77,21 +80,19 @@ MENU_KEYBOARD = InlineKeyboardMarkup([
     [InlineKeyboardButton("❌ Nevermind", callback_data="cancel")],
 ])
 
-# -------------------- /START (ONBOARDING) --------------------
+# -------------------- /START --------------------
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "👋 Hey! Nice to meet you.\n\n"
         "I’m *Jennie* — I jump in when conversations go quiet 😏\n\n"
-        "When you’re ready, type 👉 `/start_jennie` "
-        "and I’ll drop some fun conversation prompts.",
+        "Type 👉 `/start_jennie` when you want me to step in.",
         parse_mode="Markdown",
     )
 
-# -------------------- /START_JENNIE (MENU) --------------------
+# -------------------- /START_JENNIE --------------------
 
 async def start_jennie(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Menu should exist only once
     if context.chat_data.get("menu_msg_id"):
         return
 
@@ -100,7 +101,6 @@ async def start_jennie(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=MENU_KEYBOARD,
         parse_mode="Markdown",
     )
-
     context.chat_data["menu_msg_id"] = msg.message_id
 
 # -------------------- BUTTON HANDLER --------------------
@@ -111,27 +111,19 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     chat_id = query.message.chat_id
 
-    # ---------- NEVERMIND ----------
+    # ❌ NEVERMIND
     if query.data == "cancel":
-        q_id = context.chat_data.get("question_msg_id")
-        m_id = context.chat_data.get("menu_msg_id")
-
-        if q_id:
-            try:
-                await context.bot.delete_message(chat_id, q_id)
-            except:
-                pass
-
-        if m_id:
-            try:
-                await context.bot.delete_message(chat_id, m_id)
-            except:
-                pass
-
+        for key in ("question_msg_id", "menu_msg_id"):
+            msg_id = context.chat_data.get(key)
+            if msg_id:
+                try:
+                    await context.bot.delete_message(chat_id, msg_id)
+                except:
+                    pass
         context.chat_data.clear()
         return
 
-    # ---------- QUESTIONS ----------
+    # QUESTIONS
     questions = CATEGORY_MAP.get(query.data)
     if not questions:
         return
@@ -146,35 +138,23 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = f"{INTRO_LINES[query.data]}\n\n"
     for i, q in enumerate(selected, 1):
         text += f"{i}. {q}\n"
-
     text += "\n💬 Discuss. Argue. Overshare."
 
     q_id = context.chat_data.get("question_msg_id")
 
-    # Replace existing questions
     if q_id:
-        try:
-            await context.bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=q_id,
-                text=text
-            )
-            return
-        except:
-            pass
-
-    # First time showing questions
-    msg = await query.message.reply_text(text)
-    context.chat_data["question_msg_id"] = msg.message_id
+        await context.bot.edit_message_text(chat_id, q_id, text)
+    else:
+        msg = await query.message.reply_text(text)
+        context.chat_data["question_msg_id"] = msg.message_id
 
 # -------------------- FALLBACK --------------------
 
 async def fallback_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type == "private":
         await update.message.reply_text(
-            "👋 Hey! I’m **Jennie**.\n\n"
-            "When things get quiet, type `/start_jennie` "
-            "and I’ll help get the conversation going 😏",
+            "👀 I jump in only when invited.\n"
+            "Type `/start_jennie` when silence hits 😏",
             parse_mode="Markdown",
         )
 
@@ -189,7 +169,8 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, fallback_message))
 
     print("🤖 Jennie is running...")
-    app.run_polling(close_loop=False)
+    app.run_polling()
 
 if __name__ == "__main__":
     main()
+
