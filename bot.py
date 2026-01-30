@@ -24,7 +24,6 @@ from questions import (
     FINISH_THE_SENTENCE,
 )
 
-TOKEN = "8505367284:AAEWRMjSboCZDLKuccdyb5IAqUmDTEgry1I"
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
