@@ -1,28 +1,19 @@
 import random
 
-def get_questions(chat_data: dict, category: str, questions: list, count: int) -> list:
-    """
-    Rotating shuffle per chat, per category.
-    No repeats until the list is exhausted.
-    """
+def get_questions(chat_data, category, pool, count):
+    key = f"used_{category}"
+    used = set(chat_data.get(key, []))
 
-    if "shuffle_state" not in chat_data:
-        chat_data["shuffle_state"] = {}
+    available = [q for q in pool if q not in used]
 
-    state = chat_data["shuffle_state"]
+    if len(available) < count:
+        used.clear()
+        available = pool.copy()
 
-    if category not in state or state[category]["index"] >= len(state[category]["queue"]):
-        shuffled = questions.copy()
-        random.shuffle(shuffled)
-        state[category] = {
-            "queue": shuffled,
-            "index": 0
-        }
+    selected = random.sample(available, min(count, len(available)))
 
-    start = state[category]["index"]
-    end = start + count
-
-    selected = state[category]["queue"][start:end]
-    state[category]["index"] = end
+    used.update(selected)
+    chat_data[key] = list(used)
 
     return selected
+
